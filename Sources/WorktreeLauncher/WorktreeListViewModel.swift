@@ -60,6 +60,22 @@ class WorktreeListViewModel: ObservableObject {
         NSWorkspace.shared.open(URL(fileURLWithPath: worktree.path))
     }
 
+    func openInTerminal(_ worktree: WorktreeInfo) {
+        let path = worktree.path.replacingOccurrences(of: "'", with: "\\'")
+        let ws = NSWorkspace.shared
+        if ws.urlForApplication(withBundleIdentifier: "dev.warp.Warp-Stable") != nil {
+            run("/usr/bin/open", "-a", "Warp", worktree.path)
+        } else if ws.urlForApplication(withBundleIdentifier: "com.googlecode.iterm2") != nil {
+            runAppleScript("tell application \"iTerm\" to create window with default profile command \"cd '\(path)'\"")
+        } else {
+            runAppleScript("tell application \"Terminal\" to do script \"cd '\(path)'\"")
+        }
+    }
+
+    private func runAppleScript(_ script: String) {
+        run("/usr/bin/osascript", "-e", script)
+    }
+
     // Prunes stale admin reference for a prunable worktree (directory already gone).
     func pruneWorktree(_ worktree: WorktreeInfo) {
         runGitSync("worktree", "prune")

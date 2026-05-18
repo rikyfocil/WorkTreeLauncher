@@ -148,6 +148,13 @@ struct WorktreeRow: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
+            Button { vm.openInTerminal(worktree) } label: {
+                Image(systemName: "terminal")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Open in Terminal")
+
             Button("Code") { vm.openInCode(worktree) }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
