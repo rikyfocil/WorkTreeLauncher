@@ -8,6 +8,7 @@ struct WorktreeInfo: Identifiable {
     let isPrunable: Bool
     let isLocked: Bool
     let isDetached: Bool
+    let isMain: Bool
 
     var name: String {
         URL(fileURLWithPath: path).lastPathComponent

@@ -60,6 +60,36 @@ class WorktreeListViewModel: ObservableObject {
         NSWorkspace.shared.open(URL(fileURLWithPath: worktree.path))
     }
 
+    // Prunes stale admin reference for a prunable worktree (directory already gone).
+    func pruneWorktree(_ worktree: WorktreeInfo) {
+        runGitSync("worktree", "prune")
+        refresh()
+    }
+
+    // Permanently removes the worktree directory and its admin reference.
+    func deleteWorktree(_ worktree: WorktreeInfo) {
+        if !runGitSync("worktree", "remove", "--force", worktree.path) {
+            errorMessage = "Failed to remove worktree at \(worktree.name)."
+        }
+        refresh()
+    }
+
+    @discardableResult
+    private func runGitSync(_ args: String...) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["-C", repoPath] + args
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return false
+        }
+        return process.terminationStatus == 0
+    }
+
     private func run(_ executable: String, _ args: String...) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -85,7 +115,8 @@ class WorktreeListViewModel: ObservableObject {
                 branch: branchName ?? c,
                 isPrunable: isPrunable,
                 isLocked: isLocked,
-                isDetached: branch == nil
+                isDetached: branch == nil,
+                isMain: result.isEmpty
             ))
         }
 

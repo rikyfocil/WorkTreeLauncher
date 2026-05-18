@@ -3,6 +3,7 @@ import AppKit
 
 struct ContentView: View {
     @StateObject private var vm = WorktreeListViewModel()
+    @State private var worktreeToDelete: WorktreeInfo?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,6 +15,22 @@ struct ContentView: View {
             let args = CommandLine.arguments
             let path = args.count > 1 ? args[1] : FileManager.default.currentDirectoryPath
             vm.load(from: path)
+        }
+        .alert("Delete Worktree?", isPresented: Binding(
+            get: { worktreeToDelete != nil },
+            set: { if !$0 { worktreeToDelete = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let wt = worktreeToDelete {
+                    vm.deleteWorktree(wt)
+                    worktreeToDelete = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { worktreeToDelete = nil }
+        } message: {
+            if let wt = worktreeToDelete {
+                Text("This will permanently delete the worktree at:\n\(wt.path)\n\nAny uncommitted changes will be lost.")
+            }
         }
     }
 
@@ -38,7 +55,7 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             List(vm.worktrees) { worktree in
-                WorktreeRow(worktree: worktree, vm: vm)
+                WorktreeRow(worktree: worktree, vm: vm, onRequestDelete: { worktreeToDelete = $0 })
                     .listRowSeparator(.visible)
             }
             .listStyle(.inset)
@@ -90,10 +107,11 @@ struct ContentView: View {
 struct WorktreeRow: View {
     let worktree: WorktreeInfo
     @ObservedObject var vm: WorktreeListViewModel
+    let onRequestDelete: (WorktreeInfo) -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "arrow.triangle.branch")
+            Image(systemName: worktree.isMain ? "house" : "arrow.triangle.branch")
                 .foregroundColor(.accentColor)
                 .frame(width: 16)
 
@@ -103,7 +121,11 @@ struct WorktreeRow: View {
                         .font(.system(.body, design: .monospaced))
                         .fontWeight(.semibold)
                     if worktree.isPrunable {
-                        badge("prunable", color: .orange)
+                        Button(action: { vm.pruneWorktree(worktree) }) {
+                            badge("prunable", color: .orange)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Prune stale reference (working directory is gone)")
                     }
                     if worktree.isLocked {
                         badge("locked", color: .blue)
@@ -122,24 +144,27 @@ struct WorktreeRow: View {
                 .font(.system(.caption, design: .monospaced))
                 .foregroundColor(.secondary)
 
-            Button("Finder") {
-                vm.revealInFinder(worktree)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            Button("Finder") { vm.revealInFinder(worktree) }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
 
-            Button("Code") {
-                vm.openInCode(worktree)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            Button("Code") { vm.openInCode(worktree) }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
 
             if worktree.xcodeTarget != nil {
-                Button("Xcode") {
-                    vm.openInXcode(worktree)
+                Button("Xcode") { vm.openInXcode(worktree) }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+
+            if !worktree.isMain {
+                Button(role: .destructive) { onRequestDelete(worktree) } label: {
+                    Image(systemName: "trash")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .controlSize(.small)
+                .tint(.red)
             }
         }
         .padding(.vertical, 5)
