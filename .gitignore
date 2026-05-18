@@ -1,0 +1,7 @@
+.build/
+*.o
+*.d
+*.app/
+.DS_Store
+.vscode/
+.swiftpm/
