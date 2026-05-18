@@ -120,6 +120,11 @@ struct WorktreeRow: View {
                     Text(worktree.displayBranch)
                         .font(.system(.body, design: .monospaced))
                         .fontWeight(.semibold)
+                        .onTapGesture {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(worktree.displayBranch, forType: .string)
+                        }
+                        .help("Click to copy branch name")
                     if worktree.isPrunable {
                         Button(action: { vm.pruneWorktree(worktree) }) {
                             badge("prunable", color: .orange)
