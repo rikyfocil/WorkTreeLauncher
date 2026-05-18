@@ -39,6 +39,7 @@ class WorktreeListViewModel: ObservableObject {
         let output = String(data: data, encoding: .utf8) ?? ""
         worktrees = parsePorcelain(output)
         repoPath = resolved
+        UserDefaults.standard.set(resolved, forKey: "lastRepoPath")
         isLoading = false
     }
 
@@ -48,7 +49,22 @@ class WorktreeListViewModel: ObservableObject {
     }
 
     func openInCode(_ worktree: WorktreeInfo) {
-        run("/usr/bin/env", "code", worktree.path)
+        let folderURL = URL(fileURLWithPath: worktree.path)
+        // Prefer bundle lookup — works regardless of GUI app PATH stripping
+        for bundleId in ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"] {
+            if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+                NSWorkspace.shared.open([folderURL], withApplicationAt: appURL,
+                                        configuration: .init(), completionHandler: nil)
+                return
+            }
+        }
+        // Fallback: known binary locations for shells that symlink code
+        for bin in ["/usr/local/bin/code", "/opt/homebrew/bin/code"] {
+            if FileManager.default.fileExists(atPath: bin) {
+                run(bin, worktree.path)
+                return
+            }
+        }
     }
 
     func openInXcode(_ worktree: WorktreeInfo) {

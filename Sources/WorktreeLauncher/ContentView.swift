@@ -4,6 +4,10 @@ import AppKit
 struct ContentView: View {
     @StateObject private var vm = WorktreeListViewModel()
     @State private var worktreeToDelete: WorktreeInfo?
+    @State private var initialized = false
+
+    // Ensures only the first window ever opened consumes the CLI argument.
+    private static var cliArgConsumed = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -12,9 +16,16 @@ struct ContentView: View {
             content
         }
         .onAppear {
+            guard !initialized else { return }
+            initialized = true
+
             let args = CommandLine.arguments
-            let path = args.count > 1 ? args[1] : FileManager.default.currentDirectoryPath
-            vm.load(from: path)
+            if args.count > 1, !ContentView.cliArgConsumed {
+                ContentView.cliArgConsumed = true
+                vm.load(from: args[1])
+            } else if let saved = UserDefaults.standard.string(forKey: "lastRepoPath") {
+                vm.load(from: saved)
+            }
         }
         .alert("Delete Worktree?", isPresented: Binding(
             get: { worktreeToDelete != nil },
