@@ -5,6 +5,7 @@ struct ContentView: View {
     @StateObject private var vm = WorktreeListViewModel()
     @State private var worktreeToDelete: WorktreeInfo?
     @State private var initialized = false
+    @State private var currentWindow: NSWindow?
 
     // Ensures only the first window ever opened consumes the CLI argument.
     private static var cliArgConsumed = false
@@ -14,6 +15,17 @@ struct ContentView: View {
             header
             Divider()
             content
+        }
+        .background(WindowAccessor { window in
+            currentWindow = window
+            if !vm.repoPath.isEmpty {
+                WindowRegistry.shared.register(path: vm.repoPath, window: window)
+            }
+        })
+        .onChange(of: vm.repoPath) { newPath in
+            if let window = currentWindow, !newPath.isEmpty {
+                WindowRegistry.shared.register(path: newPath, window: window)
+            }
         }
         .onAppear {
             guard !initialized else { return }
@@ -27,6 +39,30 @@ struct ContentView: View {
                 vm.load(from: saved)
             }
         }
+        .onOpenURL { url in
+            let path = (url.path as NSString).expandingTildeInPath
+            if let existing = WindowRegistry.shared.window(for: path) {
+                existing.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                // Close this window — it was created solely to handle the URL event
+                // but the path is already open elsewhere.
+                if existing !== currentWindow {
+                    let orphan = currentWindow
+                    DispatchQueue.main.async { orphan?.close() }
+                }
+            } else {
+                // Register synchronously before vm.load() so a rapid second wl call
+                // for the same path can find this window immediately — onChange fires
+                // after the next render which is too late.
+                if let window = currentWindow {
+                    WindowRegistry.shared.register(path: path, window: window)
+                }
+                currentWindow?.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                vm.load(from: url.path)
+            }
+        }
+        .handlesExternalEvents(preferring: [], allowing: [])
         .alert("Delete Worktree?", isPresented: Binding(
             get: { worktreeToDelete != nil },
             set: { if !$0 { worktreeToDelete = nil } }
@@ -110,7 +146,23 @@ struct ContentView: View {
         panel.title = "Select a git repository"
         panel.prompt = "Open"
         if panel.runModal() == .OK, let url = panel.url {
-            vm.load(from: url.path)
+            let normalized = (url.path as NSString).expandingTildeInPath
+
+            if normalized == vm.repoPath {
+                vm.refresh()
+                return
+            }
+
+            // Focus an existing window that already has this path.
+            if WindowRegistry.shared.focus(path: normalized) { return }
+
+            // No existing window — open a new one by sending a URL event to ourselves.
+            var comps = URLComponents()
+            comps.scheme = "worktree-launcher"
+            comps.path = normalized
+            if let launchURL = comps.url {
+                NSWorkspace.shared.open(launchURL)
+            }
         }
     }
 }

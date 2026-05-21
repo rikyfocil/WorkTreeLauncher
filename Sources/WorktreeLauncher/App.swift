@@ -8,5 +8,6 @@ struct WorktreeLauncherApp: App {
                 .frame(minWidth: 640, minHeight: 280)
         }
         .defaultSize(width: 720, height: 420)
+        .handlesExternalEvents(matching: Set(["worktree-launcher"]))
     }
 }
