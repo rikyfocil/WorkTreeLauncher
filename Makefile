@@ -11,9 +11,10 @@ build:
 	swift build -c release 2>&1
 
 app: build
-	mkdir -p $(CONTENTS)/MacOS
+	mkdir -p $(CONTENTS)/MacOS $(CONTENTS)/Resources
 	cp $(BINARY) $(CONTENTS)/MacOS/
 	cp Info.plist $(CONTENTS)/
+	cp AppIcon.icns $(CONTENTS)/Resources/
 	codesign --sign - --force $(APP_BUNDLE)
 	@echo "✓ Built $(APP_BUNDLE)"
 
